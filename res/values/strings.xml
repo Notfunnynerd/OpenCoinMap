@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="app_name">OpenCoinMap</string>
+    <string name="action_settings">Settings</string>
+    <string name="data_url">http://coinmap.org/coinmap-data.js</string>
+    <string name="title_activity_map">OpenCoinMap</string>
+    <string name="downloading">Downloading, please wait...</string>
+    <string name="ok">Ok</string>
+    <string name="filter">Filter</string>
+    <string name="title_activity_test">TestActivity</string>
+    <string name="hello_world">Hello world!</string>
+
+</resources>
