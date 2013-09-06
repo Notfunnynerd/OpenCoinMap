@@ -1,28 +1,54 @@
 package org.notfunnynerd.opencoinmap;
 
+/**
+ * This work is licensed under the Creative Commons Attribution-ShareAlike 3.0
+ * Unported License. To view a copy of this license, visit
+ * http://creativecommons.org/licenses/by-sa/3.0/ or send a letter to Creative
+ * Commons, 444 Castro Street, Suite 900, Mountain View, California, 94041, USA.
+ * 
+ * Largely inspired by Prusnak's work : https://github.com/prusnak/coinmap
+ * Map Data CC-BY-SA by OpenStreetMap http://openstreetmap.org/
+ * Icons CC-0 by Brian Quinion http://www.sjjb.co.uk/mapicons/
+ * 
+ * @author NotFunnyNerd <notfunnynerd@gmail.com> - 2013
+ * 
+ */
+
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Map.Entry;
 
+import org.notfunnynerd.opencoinmap.models.Filter;
 import org.notfunnynerd.opencoinmap.models.Place;
-import org.notfunnynerd.opencoinmap.models.PlacesDataSource;
+import org.notfunnynerd.opencoinmap.utils.FilterListAdapter;
+import org.notfunnynerd.opencoinmap.utils.PlacesDataSource;
 import org.notfunnynerd.opencoinmap.utils.Type;
 
 import android.app.AlertDialog;
+import android.content.Context;
+import android.location.Criteria;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
 import android.os.Bundle;
 import android.support.v4.app.FragmentActivity;
-import android.text.Html;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.View.OnClickListener;
+import android.widget.AdapterView;
+import android.widget.AdapterView.OnItemClickListener;
+import android.widget.ArrayAdapter;
+import android.widget.Button;
 import android.widget.ListView;
-import android.widget.SimpleAdapter;
+import android.widget.SeekBar;
+import android.widget.SeekBar.OnSeekBarChangeListener;
 import android.widget.TextView;
-import android.widget.TextView.BufferType;
 import android.widget.Toast;
 
 import com.google.android.gms.common.GooglePlayServicesNotAvailableException;
+import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.GoogleMap.InfoWindowAdapter;
 import com.google.android.gms.maps.MapsInitializer;
@@ -32,11 +58,15 @@ import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 
-public class MapActivity extends FragmentActivity {
+public class MapActivity extends FragmentActivity implements LocationListener {
 
 	private GoogleMap mMap;
 	private PlacesDataSource datasource;
-	private HashMap<Marker, Place> markerMap = new HashMap<Marker, Place>();
+	private HashMap<Marker, Place> markerMap;
+	private ArrayList<Filter> filterList;
+	private LocationManager locationManager;
+	private String provider;
+	private Marker locMarker;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -44,17 +74,91 @@ public class MapActivity extends FragmentActivity {
 		setContentView(R.layout.activity_map);
 
 		setUpMapIfNeeded();
+
 		datasource = new PlacesDataSource(this);
-		datasource.open();
-		Log.i("Map", datasource.getPlacesCount() + " places !");
-		// semble etre necessaire pour que la map s'initialise avant de lui
-		// rajouter des choses...
+		datasource.openReadable();
+
+		populateFilterList();
+
 		try {
 			MapsInitializer.initialize(this);
 		} catch (GooglePlayServicesNotAvailableException e) {
 			e.printStackTrace();
 		}
 
+		populateMarkers();
+		initLocation();
+
+		mMap.setInfoWindowAdapter(new InfoWindowAdapter() {
+			@Override
+			public View getInfoWindow(Marker arg0) {
+				return null;
+			}
+
+			@Override
+			public View getInfoContents(Marker marker) {
+				View v = getLayoutInflater()
+						.inflate(R.layout.info_window, null);
+
+				Place place = markerMap.get(marker);
+				TextView title = (TextView) v.findViewById(R.id.title);
+				TextView popup = (TextView) v.findViewById(R.id.popup);
+
+				title.setText(place.getTitle());
+				popup.setText(place.getPopup());
+
+				return v;
+			}
+		});
+	}
+
+	private void initLocation() {
+		// Get the location manager
+		locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+
+		boolean enabled = locationManager
+				.isProviderEnabled(LocationManager.NETWORK_PROVIDER);
+
+		if (!enabled) {
+			Toast.makeText(this, getString(R.string.enable_location_service),
+					Toast.LENGTH_LONG).show();
+		}
+
+		Criteria criteria = new Criteria();
+		provider = locationManager.getBestProvider(criteria, false);
+	}
+
+	private void getLocation() {
+		locationManager.requestLocationUpdates(provider, 1000, 1, this);
+	}
+
+	@Override
+	public void onLocationChanged(Location location) {
+		double lat = (location.getLatitude());
+		double lng = (location.getLongitude());
+		Place place = new Place();
+		place.setTitle(getString(R.string.yourself));
+		place.setPopup("");
+		place.setLat(lat);
+		place.setLng(lng);
+
+		locMarker = mMap.addMarker(new MarkerOptions().position(
+				new LatLng(lat, lng)).icon(
+				BitmapDescriptorFactory
+						.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)));
+		mMap.animateCamera(CameraUpdateFactory.newLatLng(new LatLng(lat, lng)));
+		markerMap.put(locMarker, place);
+		locationManager.removeUpdates(this);
+
+	}
+
+	private void populateMarkers() {
+		if (markerMap != null) {
+			markerMap.clear();
+		} else {
+			markerMap = new HashMap<Marker, Place>();
+		}
+		mMap.clear();
 		if (mMap != null) {
 			for (Place place : datasource.getAllPlaces()) {
 
@@ -64,60 +168,55 @@ public class MapActivity extends FragmentActivity {
 					markerMap.put(mMap.addMarker(new MarkerOptions().position(
 							new LatLng(place.getLat(), place.getLng())).icon(
 							BitmapDescriptorFactory.fromResource(Type
-									.getResourceFromId(place.getType())))),
-							place);
+									.getResFromType(place.getType())))), place);
 				}
+			}
+		}
+	}
 
-				// mMap.addMarker(new MarkerOptions()
-				// .position(new LatLng(place.getLat(), place.getLng()))
-				// .title(place.getTitle())
-				// .snippet(place.getPopup())
-				// .icon(BitmapDescriptorFactory
-				// .defaultMarker(BitmapDescriptorFactory.HUE_ORANGE)));
+	private void updateMarkers() {
+		if (markerMap != null) {
+			markerMap.clear();
+		} else {
+			markerMap = new HashMap<Marker, Place>();
+		}
+		mMap.clear();
+		if (mMap != null) {
+			for (Place place : datasource.getFilteredPlaces(getCategories())) {
+
+				// If the marker isn't already being displayed
+				if (!markerMap.containsValue(place)) {
+					// Add the Marker to the Map and keep track of it
+					markerMap.put(mMap.addMarker(new MarkerOptions().position(
+							new LatLng(place.getLat(), place.getLng())).icon(
+							BitmapDescriptorFactory.fromResource(Type
+									.getResFromType(place.getType())))), place);
+				}
+			}
+		}
+	}
+
+	private String[] getCategories() {
+		ArrayList<String> tmp = new ArrayList<String>();
+		for (Filter filter : filterList) {
+			if (filter.isSelected()) {
+				tmp.add(filter.getName());
 			}
 		}
 
-		mMap.setInfoWindowAdapter(new InfoWindowAdapter() {
-			@Override
-			public View getInfoWindow(Marker arg0) {
-				return null;
-			}
+		return tmp.toArray(new String[tmp.size()]);
+	}
 
-			// Defines the contents of the InfoWindow
-			@Override
-			public View getInfoContents(Marker marker) {
-
-				// Getting view from the layout file info_window_layout
-				View v = getLayoutInflater()
-						.inflate(R.layout.info_window, null);
-
-				// Getting the position from the marker
-				Place place = markerMap.get(marker);
-
-				// Getting reference to the TextView to set latitude
-				TextView title = (TextView) v.findViewById(R.id.title);
-
-				// Getting reference to the TextView to set longitude
-				TextView popup = (TextView) v.findViewById(R.id.popup);
-
-				// Setting the latitude
-				title.setText(place.getTitle());
-
-				// Setting the longitude
-				// popup.setText(place.getPopup());
-
-				popup.setText(Html.fromHtml(place.getPopup()),
-						BufferType.SPANNABLE);
-				// Returning the view containing InfoWindow contents
-				return v;
-
-			}
-		});
+	private void populateFilterList() {
+		filterList = new ArrayList<Filter>();
+		for (String type : datasource.getTypes()) {
+			filterList.add(new Filter(type, true));
+		}
 	}
 
 	@Override
 	protected void onResume() {
-		datasource.open();
+		datasource.openReadable();
 		super.onResume();
 	}
 
@@ -134,10 +233,7 @@ public class MapActivity extends FragmentActivity {
 		return true;
 	}
 
-	/**
-	 * Event Handling for Individual menu item selected Identify single menu
-	 * item by it's id
-	 * */
+
 	@Override
 	public boolean onOptionsItemSelected(MenuItem item) {
 
@@ -145,39 +241,173 @@ public class MapActivity extends FragmentActivity {
 		case R.id.filter_item:
 			showFilterDialog();
 			return true;
-
+		case R.id.loc_item:
+			getLocation();
+			return true;
+		case R.id.near_item:
+			showRadiusDialog();
+			return true;
 		default:
 			return super.onOptionsItemSelected(item);
 		}
 	}
 
 	private void showFilterDialog() {
-		final AlertDialog.Builder helpBuilder = new AlertDialog.Builder(this);
-		helpBuilder.setTitle("");
+		final AlertDialog.Builder dialogBuilder = new AlertDialog.Builder(this);
+		dialogBuilder.setTitle(R.string.filter);
 
 		LayoutInflater inflater = getLayoutInflater();
 		final View PopupLayout = inflater
 				.inflate(R.layout.filters_dialog, null);
-		helpBuilder.setView(PopupLayout);
+		dialogBuilder.setView(PopupLayout);
 
-		final AlertDialog helpDialog = helpBuilder.create();
-		helpDialog.show();
+		final AlertDialog dialog = dialogBuilder.create();
+		dialog.show();
 
-		ListView filterList = (ListView) PopupLayout
+		ListView listView = (ListView) PopupLayout
 				.findViewById(R.id.listFilters);
 
-		ArrayList<HashMap<String, String>> mylist = new ArrayList<HashMap<String, String>>();
-		HashMap<String, String> map;
-		for (int i = 0; i < Type.TYPE_NAMES.length; i++) {
-			map = new HashMap<String, String>();
-			map.put("name", Type.TYPE_NAMES[i]);
-			mylist.add(map);
-		}
-		SimpleAdapter sd = new SimpleAdapter(MapActivity.this, mylist,
-				R.layout.filter_item, new String[] { "name" },
-				new int[] { R.id.caption });
-		filterList.setAdapter(sd);
+		final FilterListAdapter filterListAdapter = new FilterListAdapter(
+				getLayoutInflater(), filterList);
 
+		listView.setAdapter(filterListAdapter);
+
+		((Button) PopupLayout.findViewById(R.id.okButton))
+				.setOnClickListener(new OnClickListener() {
+					@Override
+					public void onClick(View v) {
+						updateMarkers();
+						dialog.dismiss();
+					}
+				});
+		((Button) PopupLayout.findViewById(R.id.selectAllButton))
+				.setOnClickListener(new OnClickListener() {
+					@Override
+					public void onClick(View v) {
+						for (Filter filter : filterList) {
+							filter.setSelected(true);
+						}
+						filterListAdapter.notifyDataSetChanged();
+					}
+				});
+
+		((Button) PopupLayout.findViewById(R.id.deselectAllButton))
+				.setOnClickListener(new OnClickListener() {
+					@Override
+					public void onClick(View v) {
+						for (Filter filter : filterList) {
+							filter.setSelected(false);
+						}
+						filterListAdapter.notifyDataSetChanged();
+
+					}
+				});
+
+	}
+
+	private ArrayList<Place> getPlacesWithinRadius(int radius) {
+		ArrayList<Place> places = new ArrayList<Place>();
+
+		if (locMarker != null) {
+			double lat = locMarker.getPosition().latitude;
+			double lng = locMarker.getPosition().longitude;
+			float[] distance = new float[2];
+
+			for (Entry<Marker, Place> entry : markerMap.entrySet()) {
+				if (entry.getKey() == locMarker)
+					continue;
+
+				Place place = entry.getValue();
+				Location.distanceBetween(place.getLat(), place.getLng(), lat,
+						lng, distance);
+				if (distance[0] <= radius) {
+					places.add(place);
+				}
+			}
+		}
+		return places;
+	}
+
+	private void showRadiusDialog() {
+		final AlertDialog.Builder dialogBuilder = new AlertDialog.Builder(this);
+		dialogBuilder.setTitle(R.string.near_you);
+
+		LayoutInflater inflater = getLayoutInflater();
+		final View layout = inflater.inflate(R.layout.radius_dialog, null);
+		dialogBuilder.setView(layout);
+
+		final AlertDialog dialog = dialogBuilder.create();
+		dialog.show();
+
+		final TextView radiusValue = (TextView) layout
+				.findViewById(R.id.radiusValue);
+
+		ListView listView = (ListView) layout.findViewById(R.id.listPlaces);
+
+		final ArrayList<Place> localPlaces = new ArrayList<Place>();
+		final ArrayAdapter<Place> adapter = new ArrayAdapter<Place>(this,
+				android.R.layout.simple_list_item_1, localPlaces);
+
+		listView.setAdapter(adapter);
+
+		final SeekBar seekRadius = (SeekBar) layout
+				.findViewById(R.id.seekRadius);
+
+		listView.setOnItemClickListener(new OnItemClickListener() {
+
+			@Override
+			public void onItemClick(AdapterView<?> arg0, View arg1,
+					int position, long arg3) {
+				dialog.dismiss();
+				Marker marker = getMarkerFromPlace(localPlaces.get(position));
+				mMap.animateCamera(CameraUpdateFactory.newLatLng(marker
+						.getPosition()));
+				marker.showInfoWindow();
+			}
+		});
+		seekRadius.setOnSeekBarChangeListener(new OnSeekBarChangeListener() {
+			int current = 0;
+
+			@Override
+			public void onProgressChanged(SeekBar seekBar, int progress,
+					boolean fromUser) {
+				current = progress;
+				radiusValue.setText("" + progress);
+			}
+
+			@Override
+			public void onStartTrackingTouch(SeekBar seekBar) {
+			}
+
+			@Override
+			public void onStopTrackingTouch(SeekBar seekBar) {
+				localPlaces.clear();
+				for (Place place : getPlacesWithinRadius(current)) {
+					localPlaces.add(place);
+				}
+				adapter.notifyDataSetChanged();
+
+			}
+		});
+
+		((Button) layout.findViewById(R.id.okButton))
+				.setOnClickListener(new OnClickListener() {
+					@Override
+					public void onClick(View v) {
+						dialog.dismiss();
+					}
+				});
+
+	}
+
+	private Marker getMarkerFromPlace(Place place) {
+		Marker marker = null;
+		for (Entry<Marker, Place> entry : markerMap.entrySet()) {
+			if (entry.getValue() == place) {
+				marker = entry.getKey();
+			}
+		}
+		return marker;
 	}
 
 	private void setUpMapIfNeeded() {
@@ -191,12 +421,23 @@ public class MapActivity extends FragmentActivity {
 				// The Map is verified. It is now safe to manipulate the map.
 
 			} else {
-				Toast.makeText(
-						this,
-						"Il semble y avoir un problème avec l'affichage de la carte. Avez-vous bien installé Google Maps ?",
+				Toast.makeText(this, getString(R.string.error_map),
 						Toast.LENGTH_LONG).show();
 			}
 		}
+	}
+
+	@Override
+	public void onProviderDisabled(String provider) {
+
+	}
+
+	@Override
+	public void onProviderEnabled(String provider) {
+	}
+
+	@Override
+	public void onStatusChanged(String provider, int status, Bundle extras) {
 	}
 
 }

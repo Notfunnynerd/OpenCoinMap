@@ -1,5 +1,19 @@
 package org.notfunnynerd.opencoinmap.utils;
 
+/**
+ * This work is licensed under the Creative Commons Attribution-ShareAlike 3.0
+ * Unported License. To view a copy of this license, visit
+ * http://creativecommons.org/licenses/by-sa/3.0/ or send a letter to Creative
+ * Commons, 444 Castro Street, Suite 900, Mountain View, California, 94041, USA.
+ * 
+ * Largely inspired by Prusnak's work : https://github.com/prusnak/coinmap
+ * Map Data CC-BY-SA by OpenStreetMap http://openstreetmap.org/
+ * Icons CC-0 by Brian Quinion http://www.sjjb.co.uk/mapicons/
+ * 
+ * @author NotFunnyNerd <notfunnynerd@gmail.com> - 2013
+ * 
+ */
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -15,34 +29,23 @@ import android.widget.CheckBox;
 import android.widget.TextView;
 
 public class FilterListAdapter extends BaseAdapter implements OnClickListener {
-	/** The inflator used to inflate the XML layout */
 	private LayoutInflater inflator;
 
-	/** A list containing some sample data to show. */
 	private List<Filter> dataList;
 
-	public FilterListAdapter(LayoutInflater inflator) {
+	public FilterListAdapter(LayoutInflater inflator,
+			ArrayList<Filter> filterList) {
 		super();
 		this.inflator = inflator;
 
-		dataList = new ArrayList<Filter>();
-
-		dataList.add(new Filter("Peter", false));
-		dataList.add(new Filter("Bob", false));
-		dataList.add(new Filter("Sara", true));
-		dataList.add(new Filter("Mitch", false));
-		dataList.add(new Filter("Tracy", false));
-		dataList.add(new Filter("Joe", false));
-		dataList.add(new Filter("George", false));
-		dataList.add(new Filter("Nancy", false));
-		dataList.add(new Filter("Susi", true));
-		dataList.add(new Filter("Homer", false));
-		dataList.add(new Filter("Lisa", false));
-		dataList.add(new Filter("Jack", false));
+		dataList = filterList;
 	}
 
 	@Override
 	public int getCount() {
+		if (dataList == null) {
+			return 0;
+		}
 		return dataList.size();
 	}
 
@@ -59,33 +62,28 @@ public class FilterListAdapter extends BaseAdapter implements OnClickListener {
 	@Override
 	public View getView(int position, View view, ViewGroup viewGroup) {
 
-		// We only create the view if its needed
 		if (view == null) {
 			view = inflator.inflate(R.layout.filter_item, null);
-
-			// Set the click listener for the checkbox
 			view.findViewById(R.id.checkbox).setOnClickListener(this);
-
 		}
 
-		Filter data = (Filter) getItem(position);
+		Filter filter = (Filter) getItem(position);
 
 		// Set the example text and the state of the checkbox
 		CheckBox cb = (CheckBox) view.findViewById(R.id.checkbox);
-		cb.setChecked(data.isSelected());
+		cb.setChecked(filter.isSelected());
 		// We tag the data object to retrieve it on the click listener.
-		cb.setTag(data);
+		cb.setTag(filter);
 
-		TextView tv = (TextView) view.findViewById(R.id.textView1);
-		tv.setText(data.getName());
+		TextView tv = (TextView) view.findViewById(R.id.caption);
+		tv.setText(filter.getBeautifulName());
 
 		return view;
 	}
 
 	@Override
-	/** Will be called when a checkbox has been clicked. */
 	public void onClick(View v) {
-		Filter data = (Filter) v.getTag();
-		data.setSelected(((CheckBox) v).isChecked());
+		Filter filter = (Filter) v.getTag();
+		filter.setSelected(((CheckBox) v).isChecked());
 	}
 }

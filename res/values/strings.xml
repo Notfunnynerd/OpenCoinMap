@@ -3,12 +3,26 @@
 
     <string name="app_name">OpenCoinMap</string>
     <string name="action_settings">Settings</string>
-    <string name="data_url">http://coinmap.org/coinmap-data.js</string>
+    <!-- opencoinmap.p.ht is a free hosting, 100 000 GB of traffic, when it's down I'll switch to the upstream feed. -->
+    <!-- <string name="data_url" formatted="false">http://overpass.osm.rambler.ru/cgi/interpreter?data=[out:json];%28node[%22payment:bitcoin%22=yes];way[%22payment:bitcoin%22=yes];%3E;%29;out;</string> -->
+    <string name="data_url">http://opencoinmap.p.ht/places.json</string>
     <string name="title_activity_map">OpenCoinMap</string>
     <string name="downloading">Downloading, please wait...</string>
-    <string name="ok">Ok</string>
+    <string name="loading_db">Loading data...</string>
+    <string name="error_map">An error happened displaying the map. Please restart the app.</string>
+    <string name="done">Done !</string>
+    <string name="ok">OK</string>
+    <string name="select_all">Select all</string>
+    <string name="deselect_all">Reset</string>
     <string name="filter">Filter</string>
-    <string name="title_activity_test">TestActivity</string>
-    <string name="hello_world">Hello world!</string>
+    <string name="loc">Loc</string>
+    <string name="near">Near</string>
+    <string name="near_you">Near you...</string>
+    <string name="refresh_db">Refresh local database</string>
+    <string name="show_map">Show map</string>
+    <string name="enable_location_service">Please enable location services to enable geolocation.</string>
+    <string name="yourself">Your current position</string>
+    <string name="radius">Radius :</string>
+    <string name="meters">meters</string>
 
 </resources>
