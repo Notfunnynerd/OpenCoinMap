@@ -26,10 +26,13 @@ import org.notfunnynerd.opencoinmap.utils.Type;
 
 import android.app.AlertDialog;
 import android.content.Context;
+import android.content.DialogInterface;
+import android.content.Intent;
 import android.location.Criteria;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
+import android.net.Uri;
 import android.os.Bundle;
 import android.support.v4.app.FragmentActivity;
 import android.view.LayoutInflater;
@@ -51,6 +54,7 @@ import com.google.android.gms.common.GooglePlayServicesNotAvailableException;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.GoogleMap.InfoWindowAdapter;
+import com.google.android.gms.maps.GoogleMap.OnInfoWindowClickListener;
 import com.google.android.gms.maps.MapsInitializer;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
@@ -108,6 +112,48 @@ public class MapActivity extends FragmentActivity implements LocationListener {
 				popup.setText(place.getPopup());
 
 				return v;
+			}
+		});
+
+		mMap.setOnInfoWindowClickListener(new OnInfoWindowClickListener() {
+			@Override
+			public void onInfoWindowClick(Marker marker) {
+				final Place place = markerMap.get(marker);
+
+				AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(
+						MapActivity.this);
+
+				alertDialogBuilder
+						.setMessage(R.string.ask_directions)
+						.setCancelable(false)
+						.setPositiveButton(R.string.yes,
+								new DialogInterface.OnClickListener() {
+									public void onClick(DialogInterface dialog,
+											int id) {
+										Intent intent = new Intent(
+												android.content.Intent.ACTION_VIEW,
+												Uri.parse("google.navigation:q="
+														+ place.getLat()
+														+ ","
+														+ place.getLng()));
+
+										startActivity(intent);
+									}
+								})
+						.setNegativeButton(R.string.no,
+								new DialogInterface.OnClickListener() {
+									public void onClick(DialogInterface dialog,
+											int id) {
+										dialog.cancel();
+									}
+								});
+
+				// create alert dialog
+				AlertDialog alertDialog = alertDialogBuilder.create();
+
+				// show it
+				alertDialog.show();
+
 			}
 		});
 	}
@@ -228,11 +274,9 @@ public class MapActivity extends FragmentActivity implements LocationListener {
 
 	@Override
 	public boolean onCreateOptionsMenu(Menu menu) {
-		// Inflate the menu; this adds items to the action bar if it is present.
 		getMenuInflater().inflate(R.menu.map, menu);
 		return true;
 	}
-
 
 	@Override
 	public boolean onOptionsItemSelected(MenuItem item) {

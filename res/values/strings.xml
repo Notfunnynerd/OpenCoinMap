@@ -24,5 +24,8 @@
     <string name="yourself">Your current position</string>
     <string name="radius">Radius :</string>
     <string name="meters">meters</string>
-
+    <string name="directions">Directions</string>
+	<string name="ask_directions">Go there?</string>
+	<string name="yes">Yes</string>
+	<string name="no">No</string>
 </resources>
